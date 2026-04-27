@@ -588,7 +588,15 @@ grep -r "发布链接：" 60_Output/公众号/ --include="*.md"
 计数器文件：`/Users/jdy/Documents/skills/jdy_writer/article-counter.txt`（存储上一篇的序号；该目录本身是 git 仓库，远端 `git@github.com:ken-zy/jdy_writer.git`）
 
 操作步骤：
-1. 读取计数器文件，获取当前值 N
+1. **先 pull rebase 同步远端，再读取计数器**（避免多机/多设备发文时本地计数滞后导致 WeChat 发错号）：
+   ```bash
+   SKILL_DIR=/Users/jdy/Documents/skills/jdy_writer
+   git -C "$SKILL_DIR" pull --rebase --autostash origin main
+   ```
+   然后读取计数器文件，获取当前值 N
+   - rebase 冲突 → 停下询问 jdy
+   - 网络失败 → 告知 jdy 是否继续；继续则用本地值（但 step 8 push 可能被 reject）
+   - `--autostash` 兜底 Phase 1.2 可能留下的 `writing-style-profile.md` 脏改动
    - **如果文件不存在或为空，必须询问用户当前序号是多少，禁止从 vault 文件数量推断**（vault 不包含全部历史文章）
 2. 发布标题 = `{N+1}/1000 {原标题}`
 3. 创建发布版本文件（见 6.3.1）
@@ -600,18 +608,15 @@ grep -r "发布链接：" 60_Output/公众号/ --include="*.md"
    - `--author`：作者名
 6. **API 失败 fallback**：如果 API 方式失败（如 IP 白名单、access token 错误），自动提示用户切换浏览器方式重试
 7. 发布成功后，将计数器更新为 N+1
-8. **同步计数器到 jdy_writer 仓库远端**（用 `git -C` 单次定向，不切换 vault 工作目录）：
+8. **commit + push 计数器到远端**（pull rebase 已在 step 1 完成，此处不再重复）：
    ```bash
-   SKILL_DIR=/Users/jdy/Documents/skills/jdy_writer
    git -C "$SKILL_DIR" add article-counter.txt
    git -C "$SKILL_DIR" commit -m "chore: bump article counter to <N+1>"
-   git -C "$SKILL_DIR" pull --rebase --autostash origin main
    git -C "$SKILL_DIR" push origin main
    ```
    - 不加 Co-Authored-By 署名（遵守 jdy 全局规则）
-   - rebase 冲突 / push 被拒 → 停下询问 jdy，**禁止** `--force`
-   - 网络失败 → 仅告知 jdy，不阻塞 vault 流程；下次发文累积的 commit 会一起 push
-   - `--autostash` 用于兜底 Phase 1.2 可能留下的 `writing-style-profile.md` 脏改动：先暂存其他变更，rebase 完自动恢复
+   - push 被拒（远端在本次发文期间又被另一台机器更新）→ 停下询问 jdy，**禁止** `--force`；此时 WeChat 已经发布，本地号已对，需手动 rebase + 解决冲突再 push
+   - 网络失败 → 告知 jdy 不阻塞 vault 流程；下次发文 step 1 pull 时会带出累积的 commit
 9. 删除 `-publish.md` 临时文件，避免污染 vault
 
 #### 6.3.1 发布版本文件管理
