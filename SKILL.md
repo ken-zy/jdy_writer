@@ -29,11 +29,12 @@ digraph workflow {
     draft [label="Phase 3\n写初稿"];
     readertest [label="Phase 3.5\n读者盲点测试\n（仅 B/C/D）"];
     iterate [label="Phase 4\n迭代修改"];
+    imagesync [label="Phase 4.5\nDaily 插图同步"];
     save [label="Phase 5\n保存"];
     extras [label="Phase 6\n配图/发布公众号/链接"];
     xpost [label="Phase 7\nX 双语推文"];
 
-    calibrate -> align -> fupan -> draft -> readertest -> iterate -> save -> extras -> xpost;
+    calibrate -> align -> fupan -> draft -> readertest -> iterate -> imagesync -> save -> extras -> xpost;
     iterate -> iterate [label="用户反馈"];
 }
 ```
@@ -511,6 +512,64 @@ Mode A 日记体跳过此步骤，直接进入 Phase 4。
 
 ---
 
+## Phase 4.5: Daily 插图同步（定稿后，保存前）
+
+如果 Phase 2 读取的 daily log 中包含图片，定稿后必须把适合入文的图片同步到公众号正文的合适位置，而不是丢失在 daily 里。
+
+### 4.5.1 识别图片
+
+扫描 daily log 中的图片引用：
+
+- Obsidian wiki embed：`![[image.jpg]]`、`![[attachments/image.jpg]]`、`![[image.jpg|说明]]`
+- Markdown 图片：`![](./attachments/image.jpg)`、`![说明](path/to/image.jpg)`
+- 已上传图片 URL：`![](https://...)`
+
+解析本地图片时，优先按 daily 文件所在目录解析相对路径；若只有文件名，则查找 daily 同级 `attachments/`。
+
+### 4.5.2 选择是否入文
+
+只同步与文章正文已经提到的场景强相关的图片：
+
+- 正文写到早餐/做饭 → 插入对应食物图
+- 正文写到外出/咖啡厅/海边/孩子/物件 → 插入对应现场图
+- 纯备忘、截图、隐私信息、聊天记录、账户/仓位/地址信息 → 不入文
+
+图片不要为了“有图”硬塞。正文没写到的 daily 图片，要么补一句自然文字再放图，要么跳过。
+
+### 4.5.3 放置位置
+
+图片紧跟在它对应的文字段落之后，不集中堆到文末：
+
+```markdown
+然后给自己做了顿早餐。昨天剩的饺子煎了一下，又炒了个香椿芽炒鸡蛋。
+
+![](./attachments/breakfast.jpg)
+```
+
+如果一张图对应一个小节，放在该小节第一段具体场景之后。不要放在标题正下方，也不要打断观点段落。
+
+### 4.5.4 文件处理
+
+本地 daily 图片需要复制到公众号文章同目录的 `attachments/` 下：
+
+```text
+60_Output/公众号/YYYYMM/attachments/<原文件名>
+```
+
+正文使用 `./attachments/<原文件名>` 引用。若文件名会泄露隐私或没有语义，可改成短英文名（如 `breakfast.jpg`、`coffee-dog.jpg`），但不要为了美化批量重命名。
+
+如果 daily 中已经是 R2/公网 URL，正文直接复用该 URL，不再下载或复制。
+
+### 4.5.5 保存前检查
+
+- 每个入文图片在正文中都有明确的场景锚点
+- 每个本地图片路径都能从公众号 md 文件位置解析
+- 不把 daily 的所有图片无差别搬过去
+- 不把含隐私、账户、地址、聊天记录的图片放入公众号
+- 如果文章完全不适合插图，明确跳过，不生成空 `attachments/` 目录
+
+---
+
 ## Phase 5: 保存
 
 ### 5.1 保存文件
@@ -584,12 +643,82 @@ grep -r "发布链接：" 60_Output/公众号/ --include="*.md"
 **文件路径约定**：Phase 5.1 保存的文件路径（如 `60_Output/公众号/202603/20260323 标题.md`）作为后续所有 skill 调用的输入，各 skill 按需从文件中读取内容。
 
 ### 6.1 文章配图
-→ 调用 `baoyu-article-illustrator` skill，传递已保存的文件路径
+→ 调用 `$imagegen` skill，使用内置 `image_gen` 工具生成文章内插图。
+
+核心原则：借鉴 `baoyu-article-illustrator` 的“先分析，再规划，再生成”思路，但执行器只用 `$imagegen`。不要调用 `baoyu-article-illustrator` / `baoyu-image-gen` / CLI fallback，除非用户明确要求。
+
+#### 6.1.1 Analyze：判断是否需要 AI 插图
+
+读取已保存的公众号 md，先看正文是否已有 Phase 4.5 同步的 daily 真实图片：
+
+- 已有 2 张以上真实图片：默认不再加文章内 AI 插图，除非文章有一个非常抽象的核心概念需要可视化
+- 已有 1 张真实图片：最多补 1 张概念/流程/隐喻图
+- 没有真实图片：根据文章长度和复杂度选择 1-3 张
+
+只给“理解文章有帮助”的位置配图：
+
+- 核心论点、抽象概念、关键对比、流程/工作流、时间线
+- 不给普通叙事段落、纯情绪段落、已有真实照片支撑的生活场景强行配图
+- 文章使用隐喻时，不要字面画隐喻；画背后的概念关系。例如“给未来的自己留证据”应画记录轨迹/时间胶囊/证据链，而不是画一个“未来的自己”
+
+#### 6.1.2 Plan：生成轻量配图计划
+
+生成前先在对话中或本地 prompt 记录里形成轻量计划，每张图必须有这 4 项：
+
+```markdown
+## Illustration N
+Position: 放在哪个小节/哪一段后
+Purpose: 为什么这张图能帮助理解
+Visual Content: 画什么，避免画什么
+Filename: NN-short-slug.png
+```
+
+如果计划里说不清 Purpose，删除这张图。
+
+#### 6.1.3 Type × Style 选择
+
+按文章内容选择图片类型和风格：
+
+| 内容信号 | 推荐 Type | 推荐 Style |
+|---------|-----------|-------------|
+| 日记/反思/生活经验 | scene / conceptual | hand-drawn / warm |
+| AI/工具/知识工作流 | framework / flowchart / infographic | minimal-flat / blueprint |
+| 投资/Web3/数据判断 | comparison / infographic | editorial / minimal-flat |
+| 时间变化/复盘/成长轨迹 | timeline / conceptual | warm / elegant |
+
+Type 是信息结构，Style 是视觉口吻。不要只写“好看的配图”；prompt 必须同时说明 Type 和 Style。
+
+#### 6.1.4 Prompt 要求
+
+使用 `$imagegen` shared prompt schema 写清楚：
+
+- Use case：`illustration-story` / `infographic-diagram` / `productivity-visual` 中选一个
+- Asset type：WeChat article inline illustration
+- Primary request：用文章里的具体主题，不写泛泛的“日更插图”
+- Scene/backdrop、Subject、Style/medium、Composition/framing、Lighting/mood、Color palette
+- Text：除非确有必要，默认不要图中文字；如果有文字，必须少而大，中文原文必须逐字给出
+- Constraints：无水印、无 logo、不要营销海报感、不要复杂背景、不要真实人脸
+
+Prompt 必须包含文章里的具体词或判断，例如“断更十天”“公开复盘”“启动成本”“给未来的自己留证据”。不能只写抽象情绪。
+
+#### 6.1.5 Generate + Insert
+
+- 用 `$imagegen` 的 built-in tool mode 生成
+- 生成后把最终图片从 `$CODEX_HOME/generated_images/...` 移动或复制到公众号文章同目录的 `illustrations/<topic-slug>/` 或 `attachments/`
+- 在正文中用相对路径引用，图片紧跟对应段落后，不集中堆到文末
+- 不覆盖已有图片；如文件已存在，用 `-v2` 后缀
+- 保存前检查：图片路径能从 md 位置解析，图的内容对应正文场景，没有隐私信息、账户信息、聊天记录、地址、logo 或水印
 
 ### 6.2 封面图
-→ 调用 `baoyu-cover-image` skill，传递已保存的文件路径
-- 默认使用 16:9 宽屏比例（公众号封面标准尺寸）
-- 封面图保存到 `./attachments/` 目录下
+→ 调用 `$imagegen` skill，使用内置 `image_gen` 工具生成公众号封面。
+
+执行规则：
+- 默认生成公众号封面图，宽屏横图；优先使用 16:9，除非用户指定其他比例
+- 封面可以包含标题文字，但必须使用文章原题，不 invent 新标题；如果担心中文渲染不准，优先生成无文字封面
+- 风格贴合文章：日记/反思文用克制、温暖、手绘或纪实感；AI/工具文可用概念化视觉；投资/Web3 文避免廉价币圈海报感
+- 用 `$imagegen` 的 built-in tool mode，不走 `baoyu-cover-image` / `baoyu-image-gen` / CLI fallback，除非用户明确要求
+- 生成后把最终封面从 `$CODEX_HOME/generated_images/...` 移动或复制到公众号文章同目录的 `attachments/cover.png`（如已存在且未明确替换，用 `cover-v2.png`）
+- 封面图作为 Phase 6.3 发布参数 `--cover` 使用；不要默认插入正文顶部
 
 ### 6.3 发布到公众号
 
