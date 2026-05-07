@@ -1,1 +1,6 @@
 .DS_Store
+node_modules/
+
+# wechat-publisher build artifacts
+wechat-publisher/node_modules/
+wechat-publisher/bun.lock
