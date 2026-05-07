@@ -307,7 +307,8 @@ async function uploadImagesInHtml(
         }
       }
     } catch (err) {
-      console.error(`[wechat-api] Failed to upload ${imagePath}:`, err);
+      // 正文图片上传失败必须中止：否则草稿正文会残留 data-local-path 或旧 src，造成 silent data corruption
+      throw new Error(`Failed to upload body image ${imagePath}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -342,7 +343,8 @@ async function uploadImagesInHtml(
         }
       }
     } catch (err) {
-      console.error(`[wechat-api] Failed to upload placeholder ${image.placeholder}:`, err);
+      // 占位符未替换会让 WECHATIMGPH_X 字符串残留进微信草稿，必须中止
+      throw new Error(`Failed to upload body image ${imagePath} (placeholder ${image.placeholder}): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -438,14 +440,15 @@ function renderMarkdownWithPlaceholders(
   const mdToWechatScript = path.join(__dirname, "md-to-wechat.ts");
   const baseDir = path.dirname(markdownPath);
 
-  const args = ["-y", "bun", mdToWechatScript, markdownPath];
+  const args = [mdToWechatScript, markdownPath];
   if (title) args.push("--title", title);
   if (theme) args.push("--theme", theme);
   if (color) args.push("--color", color);
   if (!citeStatus) args.push("--no-cite");
 
   console.error(`[wechat-api] Rendering markdown with placeholders via md-to-wechat: ${theme}${color ? `, color: ${color}` : ""}, citeStatus: ${citeStatus}`);
-  const result = spawnSync("npx", args, {
+  // 用当前 runtime（bun）直接 re-spawn，避免 npx -y 联网拉 npm 包
+  const result = spawnSync(process.execPath, args, {
     stdio: ["inherit", "pipe", "pipe"],
     cwd: baseDir,
   });
