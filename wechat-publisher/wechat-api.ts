@@ -307,7 +307,8 @@ async function uploadImagesInHtml(
         }
       }
     } catch (err) {
-      console.error(`[wechat-api] Failed to upload ${imagePath}:`, err);
+      // 正文图片上传失败必须中止：否则草稿正文会残留 data-local-path 或旧 src，造成 silent data corruption
+      throw new Error(`Failed to upload body image ${imagePath}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
@@ -342,7 +343,8 @@ async function uploadImagesInHtml(
         }
       }
     } catch (err) {
-      console.error(`[wechat-api] Failed to upload placeholder ${image.placeholder}:`, err);
+      // 占位符未替换会让 WECHATIMGPH_X 字符串残留进微信草稿，必须中止
+      throw new Error(`Failed to upload body image ${imagePath} (placeholder ${image.placeholder}): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
