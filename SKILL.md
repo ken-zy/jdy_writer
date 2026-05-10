@@ -926,11 +926,13 @@ API 发布只创建草稿。用户需要去公众号后台 review + 群发，然
 
 ---
 
-## Phase 7: X 双语推文（公众号流程结束后）
+## Phase 7: X 中文推文（公众号流程结束后）
 
-公众号发布完成后（6.4 完成或用户明确跳过后），进入 X 推文生成。
+公众号发布完成后（6.4 完成或用户明确跳过后），进入 X 中文推文生成。
 
-### 7.1 中文版：直接使用公众号原文
+> **2026-05-10 调整**：删除英文版路径——作者只发中文 X，不再做语义重写英文版/Thread。
+
+### 7.1 直接使用公众号原文
 
 中文版**不做任何改写**，直接使用公众号文章全文作为推文内容。
 
@@ -938,7 +940,11 @@ API 发布只创建草稿。用户需要去公众号后台 review + 群发，然
 
 **X Article markdown 文件准备**：
 - 文件命名：`{YYYYMMDD}-x-post-cn.md`，保存在与公众号文章同一目录
-- 内容 = 公众号原文（含配图），但**剥离正文开头的封面图行**（即 Phase 6.2 插入的 `![](https://...cover.png)` 那一行，封面通过 `--cover` 单独传）和**排除发布链接行**
+- 内容 = 公众号原文（含配图），但**剥离**：
+  - **正文开头的封面图行**（即 Phase 6.2 插入的 `![](https://...cover.png)` 那一行，封面通过 `--cover` 单独传）
+  - **发布链接行**（`> 发布链接：...`）
+  - **`## 关联` 小节**（vault 内部双链区，对外读者无意义）
+  - **主话题键 HTML 注释**（`<!-- 主话题: ... -->`）
 - 添加 YAML frontmatter：`title: 原标题`（不含序号前缀）
 - 配图使用相对路径（与公众号文章相同的 `./illustrations/...` 路径）
 
@@ -964,64 +970,54 @@ API 发布只创建草稿。用户需要去公众号后台 review + 群发，然
 
 用户选择后，每个选中板块使用该板块的原文内容。
 
-### 7.2 英文版：语义重写
+### 7.2 输出格式
 
-英文版是独立创作，不是中文的翻译：
-- 字数：1-280 characters
-- **不是逐字翻译，是语义重写**——用英文 X 的表达习惯
-- 更直接、更 provocative、可以更口语
-- 专有名词保持原文（BTC、ETH、项目名等）
-
-**英文版策略（基于公众号风格模式）**：
-
-| 公众号模式 | 英文策略 | 说明 |
-|-----------|---------|------|
-| A 日记体 | **精选浓缩** | 与中文版选择相同板块，每个板块独立生成 1 条英文推文 |
-| B 深度思考 | **核心论点** | 浓缩为 1 条有冲击力的英文观点推文 |
-| C 框架/教程 | **Thread** | 拆解为 3-5 条连贯英文 Thread |
-| D 长叙事 | **精华提炼** | 提取 1-2 条最有传播力的英文推文 |
-
-**Thread 规则**（Mode C）：
-- 第 1 条：钩子——最有冲击力的结论或问题
-- 中间条：展开论点，每条一个独立观点
-- 最后 1 条：总结 or 行动建议 or 金句收尾
-- 每条之间用编号连接
-
-### 7.3 输出格式
-
-一次性输出中英文预览，用户一次确认：
+一次性输出预览，用户一次确认：
 
 ```
-## X 推文预览
+## X 中文推文预览
 
-### 中文版（@中文账号）
 [公众号原文，排版格式化后]
-
-### English（@English account）
-1. [Tweet content] (XX/280 chars)
 
 → 确认 / 调整 / 跳过 X 发布？
 ```
 
-如果是 Thread，每条都列出并标注字符数。
+### 7.3 发布
 
-### 7.4 发布
+> **2026-05-10 内化**：从 `baoyu-post-to-x` 外部 skill 迁入 jdy_writer 自带的 `x-publisher/`，完全自包含（同 wechat-publisher 模式）。原 baoyu 路径不再依赖。
 
-用户确认后，依次调用 `baoyu-post-to-x` skill：
+用户确认后，调用 jdy_writer 内置的 x-publisher：
 
-1. **发布中文版**：
-   - **X Article**（长文，Mode B/C/D 或 Mode A 全文）：使用 `x-article.ts`，传入准备好的 markdown 文件 + `--cover` 封面图 + `--profile` 中文账号 profile
-   - **普通推文**（280 字以内）：使用 `x-browser.ts`
-   - Profile：`~/.local/share/x-browser-profile-cn`
-2. **发布英文版**：调用 `baoyu-post-to-x`，使用英文账号 profile（`~/.local/share/x-browser-profile-en`）
+```bash
+SKILL_DIR=/Users/jdy/Documents/obsidian/.claude/skills/jdy_writer
+PROFILE=~/.local/share/x-browser-profile-cn
+
+# X Article 长文（Mode B/C/D 或 Mode A 全文）
+bun "$SKILL_DIR/x-publisher/x-article.ts" \
+  "<vault-path>/<YYYYMM>/<YYYYMMDD>-x-post-cn.md" \
+  --cover "<vault-path>/<YYYYMM>/attachments/cover.png" \
+  --profile "$PROFILE"
+
+# 普通推文（280 字以内）— 使用 x-browser.ts（同样在 x-publisher/ 下）
+```
+
+**首次运行需安装依赖**（一次性）：
+
+```bash
+cd "$SKILL_DIR/x-publisher" && bun install
+```
 
 **Profile 配置**：
-- 默认 profile 路径可通过 `baoyu-post-to-x` 的 EXTEND.md 自定义（见该 skill 的 Preferences 章节）
-- 首次使用每个 profile 时需手动登录对应 X 账号
+- 默认 profile：`~/.local/share/x-browser-profile-cn`（中文账号）
+- 首次使用 profile 时需在 baoyu 启动的 Chrome 窗口里手动登录 X
+- baoyu 默认 profile 是 `~/Library/Application Support/baoyu-skills/chrome-profile`（macOS），如不传 `--profile` 会用这个；为了用 X 中文账号 profile，**必须显式传 `--profile`**
 
-**Thread 发布**（Mode C）：按顺序发布，第一条发完后在其下回复后续条目。使用 `baoyu-post-to-x` 的 reply 功能。
+**已知行为**：
+- 默认是 **draft 模式**——脚本完成后浏览器保持打开，等用户人工 review 后点"发布"。加 `--submit` 可自动发布
+- 若 macOS 缺 Accessibility 权限，自动粘贴会失败，脚本会复制 HTML 到剪贴板并等 30s 让用户手动 Cmd+V
+- **占位符残留**：x-article.ts 偶尔在第二张图后留下 `XIMGPH_N` 占位符文本（图片实际已插入）。发布前 Cmd+F 搜 `XIMGPH` 检查并删除
 
-### 7.5 带图发布（可选）
+### 7.4 带图发布（可选）
 
 如果本次流程执行了 Phase 6.1 文章配图，询问是否将配图用于 X 推文：
 
@@ -1030,8 +1026,6 @@ API 发布只创建草稿。用户需要去公众号后台 review + 群发，然
 ```
 
 附图时加 `--image` 参数。
-
----
 
 ## 观点深度：三种技法
 
