@@ -158,7 +158,7 @@ async function loadUploadAsset(
   };
 }
 
-async function uploadImage(
+export async function uploadImage(
   imagePath: string,
   accessToken: string,
   baseDir?: string,
@@ -167,7 +167,13 @@ async function uploadImage(
   const asset = await loadUploadAsset(imagePath, baseDir);
   let uploadAsset = asset;
 
-  if (uploadType === "body" && needsWechatBodyImageProcessing(asset)) {
+  // Both body (media/uploadimg) and material (material/add_material) endpoints reject
+  // WeChat-unsupported formats (WebP/GIF/BMP/SVG/...) and oversize images. Run the same
+  // prep step for both. See spec §7.3.
+  if (
+    (uploadType === "body" || uploadType === "material") &&
+    needsWechatBodyImageProcessing(asset)
+  ) {
     const prepared = await prepareWechatBodyImageUpload(asset);
     uploadAsset = {
       ...asset,
@@ -178,7 +184,7 @@ async function uploadImage(
       fileSize: prepared.buffer.length,
     };
     const note = prepared.processingNotes.join(", ");
-    console.error(`[wechat-api] Processed ${asset.filename} for body upload: ${note}`);
+    console.error(`[wechat-api] Processed ${asset.filename} for ${uploadType} upload: ${note}`);
   }
 
   const result = await uploadToWechat(
@@ -783,7 +789,18 @@ async function main(): Promise<void> {
   console.error(`[wechat-api] Published successfully! media_id: ${result.media_id}`);
 }
 
-await main().catch((err) => {
-  console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+// Run main() only when this file is executed directly as a CLI, not when imported as a module
+// (e.g. by tests). Bun and Node expose import.meta.main / import.meta.url for this check.
+const isDirectRun =
+  // @ts-expect-error — Bun exposes import.meta.main
+  (typeof import.meta.main === "boolean" && import.meta.main) ||
+  (typeof process !== "undefined" &&
+    process.argv[1] &&
+    fileURLToPath(import.meta.url) === fs.realpathSync(process.argv[1]));
+
+if (isDirectRun) {
+  await main().catch((err) => {
+    console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
+  });
+}
