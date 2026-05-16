@@ -1054,7 +1054,7 @@ PROFILE=~/.local/share/x-browser-profile-cn
 # X Article 长文（Mode B/C/D 或 Mode A 全文）
 bun "$SKILL_DIR/x-publisher/x-article.ts" \
   "<vault-path>/<YYYYMM>/<YYYYMMDD>-x-post-cn.md" \
-  --cover "$COVER_URL" \
+  --cover "$LOCAL_COVER_PATH" \
   --profile "$PROFILE"
 
 # 普通推文（280 字以内）— 使用 x-browser.ts（同样在 x-publisher/ 下）
@@ -1073,6 +1073,7 @@ cd "$SKILL_DIR/x-publisher" && bun install
 
 **已知行为**：
 - 默认是 **draft 模式**——脚本完成后浏览器保持打开，等用户人工 review 后点"发布"。加 `--submit` 可自动发布
+- X Article 的 `--cover` 必须传本地图片路径（如 `/tmp/jdy-writer-cover/<YYYYMMDD>-cover.png`），不要传 R2 URL；当前 `x-article.ts` 会把 URL 当成本地路径解析，导致封面看似设置但实际不显示。
 - 若 macOS 缺 Accessibility 权限，自动粘贴会失败，脚本会复制 HTML 到剪贴板并等 30s 让用户手动 Cmd+V
 - **占位符残留**：x-article.ts 偶尔在第二张图后留下 `XIMGPH_N` 占位符文本（图片实际已插入）。发布前 Cmd+F 搜 `XIMGPH` 检查并删除
 
