@@ -708,10 +708,10 @@ chmod 600 ~/.jdy_writer/.env
 # 获取当前公网 IP
 IP=$(curl -s https://api.ipify.org)
 echo "当前公网 IP：$IP"
-echo "→ 确保此 IP 已加入公众号后台 IP 白名单（设置与开发 → 基本配置 → IP 白名单）"
+echo "→ 继续发布；如公众号 API 返回 40164 invalid ip，再提示用户把该 IP 加入白名单"
 ```
 
-提示用户："如果是新 IP 或第一次发布，先去公众号后台白名单加 `$IP`，加完回复确认。"
+**执行规则**：不要在发布前询问用户 IP 是否已加入白名单。直接进入 Phase 6.3 调用发布 API；只有实际报错 `40164: invalid ip` 时，才停下来提示用户把错误信息中的 IP 加入公众号后台白名单后重试。
 
 **Secret 泄露应急流程**（如果 secret 已经出现在对话/transcript/任何日志里）：
 
