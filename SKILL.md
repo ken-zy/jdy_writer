@@ -777,8 +777,12 @@ Prompt: <完整的英文 prompt，按 6.1.3 规则>
 #### 6.1.5 插入
 
 - 生成路径：codex 生成的 PNG 落 `/tmp/jdy-writer-illustrations/<topic-slug>/NN-<slug>.png`（不再落到 vault 内的 `illustrations/` 目录）
-- 立即上传 R2：
+- 立即上传 R2（必须先 source env 文件加载 5 个变量）：
   ```bash
+  # `~/.config/r2-pipeline/env` 含 5 个变量：
+  #   R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / IMG_SUBDOMAIN / R2_BUCKET / R2_ACCOUNT_ID
+  # 这些变量 *不在* shell startup config 中——必须显式 source；不要尝试读取 env 文件内容（含密钥）
+  set -a && source /Users/jdy/.config/r2-pipeline/env && set +a
   R2_URL="$(bash /Users/jdy/Documents/obsidian/scripts/r2-upload.sh \
     "/tmp/jdy-writer-illustrations/<topic-slug>/NN-<slug>.png" \
     "illustrations/<YYYYMMDD>-<topic-slug>-NN-<slug>")"
@@ -817,11 +821,15 @@ Prompt: <按 cover-design-framework.md 规则的英文 prompt，含 16:9>
 #### 6.2.3 R2 上传 + 正文嵌入
 
 ```bash
+# r2-upload.sh 需要 5 个 env vars，必须先 source（参考 6.1.5）
+set -a && source /Users/jdy/.config/r2-pipeline/env && set +a
 COVER_URL="$(bash /Users/jdy/Documents/obsidian/scripts/r2-upload.sh \
   "/tmp/jdy-writer-cover/<YYYYMMDD>-cover.png" \
   "illustrations/<YYYYMMDD>-cover")"
 # r2-upload.sh: cwebp q=90 + wrangler put + 删 /tmp/.../cover.png 本地副本
 # stdout: https://img.jdy.systems/illustrations/<YYYYMMDD>-cover.webp（已捕获到 $COVER_URL）
+# 注意：r2-upload.sh 上传成功后会删本地 cover.png；如果后续 Phase 6.3 需要本地路径，
+#       必须从 R2 重新下载到 /tmp/jdy-writer-cover/<YYYYMMDD>-cover.webp
 ```
 
 R2 公网 URL：`$COVER_URL`（已由 r2-upload.sh stdout 捕获，格式为 `https://img.jdy.systems/illustrations/<YYYYMMDD>-cover.webp`）
@@ -889,15 +897,21 @@ awk '
 
 ```bash
 SKILL_DIR=/Users/jdy/Documents/obsidian/.claude/skills/jdy_writer
+# wechat-api.ts 的 --cover **只接受本地路径**，传 URL 会被当成相对路径解析报 "Image not found"。
+# 如果 cover 已被 r2-upload.sh 删除本地副本，先从 R2 下载回来：
+#   curl -sSL -o /tmp/jdy-writer-cover/<YYYYMMDD>-cover.webp \
+#     "$COVER_URL"   # 或显式 https://img.jdy.systems/illustrations/<YYYYMMDD>-cover.webp
+# wechat-api.ts 会自动把 .webp 转 JPEG (q=82) 后上传 material API。
+LOCAL_COVER=/tmp/jdy-writer-cover/<YYYYMMDD>-cover.webp
 cd "$SKILL_DIR/wechat-publisher" && npx -y bun wechat-api.ts \
   "<vault-path>/<YYYYMM>/<原文件名>-publish.md" \
   --title "{N+1}/1000 原标题" \
   --author "jdy" \
   --summary "正文前 1-2 句（不含标题）" \
-  --cover "$COVER_URL"
+  --cover "$LOCAL_COVER"
 ```
 
-（wechat-publisher 接到 URL 参数后会自动 fetch 远程图，经 e1d0052 修复后的 material 路径会跑 WebP→PNG/JPEG 转换 → 上传公众号 material API）
+（**正文图** URL 会被 wechat-publisher 自动 fetch + WebP→JPEG 转换 + 上传 material API；**封面图** 不走这个路径，必须本地。）
 
 **首次运行需安装依赖**（一次性）：
 
