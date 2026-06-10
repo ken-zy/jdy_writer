@@ -852,7 +852,7 @@ R2 公网 URL：`$COVER_URL`（已由 r2-upload.sh stdout 捕获，格式为 `ht
 
 #### 6.3.1 标题计数
 
-格式：`N/1000 标题`。计数器：`/Users/jdy/Documents/skills/jdy_writer/article-counter.txt`（git 仓库 `git@github.com:ken-zy/jdy_writer.git`）。
+格式：`N. 标题`。计数器：`/Users/jdy/Documents/skills/jdy_writer/article-counter.txt`（git 仓库 `git@github.com:ken-zy/jdy_writer.git`）。
 
 发布前先同步远端：
 
@@ -861,7 +861,7 @@ SKILL_DIR=/Users/jdy/Documents/skills/jdy_writer
 git -C "$SKILL_DIR" pull --rebase --autostash origin main
 ```
 
-读取当前 N，发布标题为 `{N+1}/1000 原标题`。
+读取当前 N，发布标题为 `{N+1}. 原标题`。
 
 异常处理：
 - rebase 冲突 → 停下问 jdy
@@ -875,7 +875,6 @@ git -C "$SKILL_DIR" pull --rebase --autostash origin main
   - **去掉末尾的发布链接行**（`> 发布链接：...`）
   - **去掉 `## 关联` 小节**（vault 内部双链区，含 `[[K-xxx]]` / `[[A-xxx]]` 等，对外读者无意义且渲染异常）
   - **去掉主话题键 HTML 注释**（`<!-- 主话题: ... -->`，仅 vault 去重用）
-- 末尾追加固定引流段落（见 6.3.4）
 - 发布完后删除（避免污染 vault）
 
 **剥离实现参考**（bash/sed）：
@@ -905,7 +904,7 @@ SKILL_DIR=/Users/jdy/Documents/obsidian/.claude/skills/jdy_writer
 LOCAL_COVER=/tmp/jdy-writer-cover/<YYYYMMDD>-cover.webp
 cd "$SKILL_DIR/wechat-publisher" && npx -y bun wechat-api.ts \
   "<vault-path>/<YYYYMM>/<原文件名>-publish.md" \
-  --title "{N+1}/1000 原标题" \
+  --title "{N+1}. 原标题" \
   --author "jdy" \
   --summary "正文前 1-2 句（不含标题）" \
   --cover "$LOCAL_COVER"
@@ -935,33 +934,11 @@ cd "$SKILL_DIR/wechat-publisher" && npx -y bun install
 - 新草稿创建成功后，用 `draft/delete` 删除上一版草稿，避免后台同时存在多个同标题版本。
 - 如果创建新草稿失败，不删除旧草稿；先保留可用版本，再处理错误。
 
-#### 6.3.4 末尾引流段落（固定，逐字使用）
+#### 6.3.4 末尾引流段落
 
-```markdown
----
+默认不追加任何固定引流段落。
 
-<img src="../ken_wang.jpg" width="200" style="display:block;margin:0 auto;" />
-
-我自己每天在用一张空投评分表，四个维度——发币意愿、链上数据、筹码、成本。
-
-做这个表不是因为我有什么 alpha，是怕反撸——花了时间精力最后倒贴。
-
-我用它劝自己：这个项目不值得跑。
-
-不一定对。但每条都是踩过的坑。
-
-如果你也在跑空投，把你正在跑的项目发我，我帮你跑一下。
-```
-
-规则：
-- **逐字使用，不改写、不二次创作**
-- 开头 `---` 是视觉分隔线
-- 二维码用 inline HTML 控制居中和宽度
-- 不询问用户，直接追加
-
-二维码源文件：`/Users/jdy/Documents/skills/jdy_writer/ken_wang.jpg`。
-- 若 vault `60_Output/公众号/ken_wang.jpg` 不存在，先复制
-- 发布版本相对路径：`202605/...-publish.md` → `../ken_wang.jpg`；`公众号/...md` → `./ken_wang.jpg`
+如果 jdy 在本次发布中明确要求追加引流、二维码或固定 CTA，才按当次指令加入发布版本文件。不要自动加入任何历史固定引流内容。
 
 #### 6.3.5 计数器递增 + 清理
 
