@@ -905,7 +905,7 @@ LOCAL_COVER=/tmp/jdy-writer-cover/<YYYYMMDD>-cover.webp
 cd "$SKILL_DIR/wechat-publisher" && npx -y bun wechat-api.ts \
   "<vault-path>/<YYYYMM>/<原文件名>-publish.md" \
   --title "{N+1}. 原标题" \
-  --author "jdy" \
+  --author "泽永" \
   --summary "正文前 1-2 句（不含标题）" \
   --cover "$LOCAL_COVER"
 ```
